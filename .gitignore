@@ -1,0 +1,41 @@
+.gitconfig
+
+# Rust build artifacts
+/target
+**/target
+
+# Cargo lock file — commit for binaries, ignore for libraries.
+# This workspace produces the `repo` binary, so Cargo.lock is committed.
+# Uncomment the next line if you prefer to ignore it:
+# Cargo.lock
+
+# IDE / Editor
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Coverage
+coverage/
+*.profraw
+
+# Environment / Secrets
+.env
+.env.local
+
+# Backup files
+*.bak
+*.orig
+
+# BATS test artifacts (if any)
+tests/bats/tmp/

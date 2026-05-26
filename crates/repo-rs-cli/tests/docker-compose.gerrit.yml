@@ -1,0 +1,26 @@
+services:
+  gerrit:
+    image: gerritcodereview/gerrit
+    container_name: repo-rs-gerrit-test
+    ports:
+      - "8080:8080"
+      - "29418:29418"
+    volumes:
+      - gerrit-git:/var/gerrit/git
+      - gerrit-db:/var/gerrit/db
+      - gerrit-index:/var/gerrit/index
+      - gerrit-cache:/var/gerrit/cache
+    environment:
+      - CANONICAL_WEB_URL=http://localhost:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/config/server/version"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  gerrit-git:
+  gerrit-db:
+  gerrit-index:
+  gerrit-cache:

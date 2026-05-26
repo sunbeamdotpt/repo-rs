@@ -1,0 +1,29 @@
+[package]
+name = "repo-rs-git"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+git2 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+tempfile = { workspace = true }
+camino = { workspace = true }
+url = { workspace = true }
+async-trait = { workspace = true }
+mockall = { workspace = true, optional = true }
+shellexpand = "3.0"
+
+[dev-dependencies]
+mockall = { workspace = true }
+tokio-test = "0.4"
+
+[features]
+test-util = ["mockall"]
+
+[lints]
+workspace = true

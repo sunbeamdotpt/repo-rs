@@ -1,0 +1,25 @@
+[package]
+name = "repo-rs-cmd"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+repo-rs-model = { workspace = true }
+repo-rs-engine = { workspace = true }
+clap = { workspace = true }
+anstream = { workspace = true }
+indicatif = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+camino = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

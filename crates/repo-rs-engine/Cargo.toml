@@ -1,0 +1,33 @@
+[package]
+name = "repo-rs-engine"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+repo-rs-manifest = { workspace = true }
+repo-rs-model = { workspace = true }
+repo-rs-git = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+rayon = { workspace = true }
+indexmap = { workspace = true }
+anstream = { workspace = true }
+camino = { workspace = true }
+url = { workspace = true }
+async-trait = { workspace = true }
+mockall = { workspace = true }
+regex = { workspace = true }
+walkdir = "2.5"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = "0.4"
+git2 = { workspace = true }
+repo-rs-git = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

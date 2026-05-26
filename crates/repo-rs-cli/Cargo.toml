@@ -1,0 +1,31 @@
+[package]
+name = "repo-rs-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "repo"
+path = "src/main.rs"
+
+[dependencies]
+repo-rs-cmd = { workspace = true }
+repo-rs-engine = { workspace = true }
+repo-rs-git = { workspace = true }
+repo-rs-model = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+camino = { workspace = true }
+anstream = { workspace = true }
+indexmap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+serde_json = "1.0"
+
+[lints]
+workspace = true
