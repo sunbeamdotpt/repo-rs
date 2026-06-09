@@ -294,6 +294,7 @@ mod tests {
             clone_depth: None,
             force_path: None,
             sync_strategy: None,
+            rebase: None,
             annotations: Vec::new(),
             copyfiles: Vec::new(),
             linkfiles: Vec::new(),
