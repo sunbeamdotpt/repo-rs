@@ -921,7 +921,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "repo-rs-cli"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anstream",
  "camino",
@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-cmd"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anstream",
  "async-trait",
@@ -957,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-engine"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anstream",
  "async-trait",
@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-git"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "camino",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-manifest"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "camino",
  "indexmap",
@@ -1012,7 +1012,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-model"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "camino",
  "indexmap",

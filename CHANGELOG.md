@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-09
+
+### Fixed
+
+- **sync defers copyfiles/linkfiles**: `copyfile` and `linkfile` application is now deferred until after all projects have been cloned, fetched, and checked out. This prevents linkfiles targeting paths inside later projects' worktrees from creating those directories early and blocking later `git clone` operations.
+- **sync rebase applies copyfiles/linkfiles**: Projects successfully rebased during `repo sync` now also have their copyfiles and linkfiles applied (previously they were silently skipped).
+
+### Added
+
+- **regression tests**: Added tests verifying that linkfiles and copyfiles into not-yet-cloned project directories do not block clone operations, and that rebase correctly applies copyfiles and linkfiles.
+
 ## [0.2.1] - 2026-06-09
 
 ### Fixed
