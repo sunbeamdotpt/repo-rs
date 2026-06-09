@@ -21,33 +21,33 @@ repo-rs-cli = { path = "crates/repo-rs-cli", version = "0.1.0" }
 
 # Core
 git2 = "0.21"
-thiserror = "2.0.18"
-anyhow = "1.0.102"
-tracing = "0.1.44"
+thiserror = "2.0"
+anyhow = "1"
+tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # CLI
-clap = { version = "4.6.1", features = ["derive", "env", "wrap_help"] }
-anstream = "1.0.0"
-indicatif = "0.18.4"
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+anstream = "1"
+indicatif = "0.18"
 
 # Data
-serde = { version = "1.0.228", features = ["derive"] }
-quick-xml = { version = "0.40.1", features = ["serialize"] }
-indexmap = "2.14.0"
-url = "2.5.8"
-camino = "1.2.2"
+serde = { version = "1", features = ["derive"] }
+quick-xml = { version = "0.40", features = ["serialize"] }
+indexmap = "2.14"
+url = "2.5"
+camino = "1.2"
 
 # Async / Parallel
-tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "process", "fs", "io-util"] }
-async-trait = "0.1.89"
-rayon = "1.12.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "io-util"] }
+async-trait = "0.1"
+rayon = "1.12"
 
 # Testing
-mockall = "0.13.0"
+mockall = "0.13"
 
 # Utils
-tempfile = "3.27.0"
+tempfile = "3"
 regex = "1.11"
 
 [profile.release]
