@@ -5,6 +5,10 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Manifest parsing and management for repo-rs"
+repository.workspace = true
+keywords = ["repo", "git", "manifest"]
+categories = ["development-tools"]
 
 [dependencies]
 quick-xml = { workspace = true }

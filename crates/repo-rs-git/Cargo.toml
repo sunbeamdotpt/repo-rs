@@ -5,6 +5,10 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Git operations and repository handling for repo-rs"
+repository.workspace = true
+keywords = ["repo", "git", "manifest"]
+categories = ["development-tools"]
 
 [dependencies]
 git2 = { workspace = true }

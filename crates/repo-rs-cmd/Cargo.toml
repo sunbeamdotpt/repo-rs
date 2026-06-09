@@ -1,10 +1,14 @@
 [package]
 name = "repo-rs-cmd"
+description = "Command-line interface for repo-rs"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+keywords = ["repo", "git", "manifest", "cli"]
+categories = ["development-tools"]
 
 [dependencies]
 repo-rs-model = { workspace = true }

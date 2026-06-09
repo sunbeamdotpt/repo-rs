@@ -5,6 +5,11 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Command-line interface for repo-rs"
+repository.workspace = true
+keywords = ["repo", "git", "manifest"]
+readme = "README.md"
+categories = ["development-tools"]
 
 [[bin]]
 name = "repo"

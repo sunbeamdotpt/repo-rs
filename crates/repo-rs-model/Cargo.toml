@@ -1,10 +1,14 @@
 [package]
 name = "repo-rs-model"
+description = "Data models for repo-rs"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+keywords = ["repo", "git", "manifest"]
+categories = ["development-tools"]
 
 [dependencies]
 repo-rs-manifest = { workspace = true }

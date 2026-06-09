@@ -5,6 +5,10 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Core engine for repo-rs"
+repository.workspace = true
+keywords = ["repo", "git", "manifest"]
+categories = ["development-tools"]
 
 [dependencies]
 repo-rs-manifest = { workspace = true }
