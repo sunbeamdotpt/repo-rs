@@ -32,7 +32,7 @@ impl Command for DiffArgs {
         let projects = ctx.client.projects.keys().cloned().collect::<Vec<_>>();
         let engine = repo_rs_engine::DefaultDiff;
         let output = engine.diff(ctx, projects, opts).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

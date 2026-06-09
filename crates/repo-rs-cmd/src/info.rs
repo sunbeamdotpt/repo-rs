@@ -75,7 +75,7 @@ impl Command for InfoArgs {
         let projects = ctx.client.projects.keys().cloned().collect::<Vec<_>>();
         let engine = repo_rs_engine::DefaultInfo;
         let output = engine.info(ctx, projects, opts).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

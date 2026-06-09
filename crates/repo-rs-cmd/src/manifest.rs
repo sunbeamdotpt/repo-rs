@@ -56,7 +56,7 @@ impl Command for ManifestArgs {
 
         let engine = repo_rs_engine::DefaultManifestCmd;
         let output = engine.manifest(ctx, opts).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

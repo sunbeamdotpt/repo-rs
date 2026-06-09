@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "3"
 
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 authors = ["repo-rs contributors"]
 edition = "2024"
 rust-version = "1.85"
@@ -12,12 +12,12 @@ repository = "https://github.com/sunbeamdotpt/repo-rs"
 
 [workspace.dependencies]
 # Internal crates
-repo-rs-manifest = { path = "crates/repo-rs-manifest", version = "0.2.2" }
-repo-rs-model = { path = "crates/repo-rs-model", version = "0.2.2" }
-repo-rs-git = { path = "crates/repo-rs-git", version = "0.2.2" }
-repo-rs-engine = { path = "crates/repo-rs-engine", version = "0.2.2" }
-repo-rs-cmd = { path = "crates/repo-rs-cmd", version = "0.2.2" }
-repo-rs-cli = { path = "crates/repo-rs-cli", version = "0.2.2" }
+repo-rs-manifest = { path = "crates/repo-rs-manifest", version = "0.2.3" }
+repo-rs-model = { path = "crates/repo-rs-model", version = "0.2.3" }
+repo-rs-git = { path = "crates/repo-rs-git", version = "0.2.3" }
+repo-rs-engine = { path = "crates/repo-rs-engine", version = "0.2.3" }
+repo-rs-cmd = { path = "crates/repo-rs-cmd", version = "0.2.3" }
+repo-rs-cli = { path = "crates/repo-rs-cli", version = "0.2.3" }
 
 # Core
 git2 = "0.21"

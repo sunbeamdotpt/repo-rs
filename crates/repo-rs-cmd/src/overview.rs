@@ -27,7 +27,7 @@ impl Command for OverviewArgs {
         let projects = ctx.client.projects.keys().cloned().collect::<Vec<_>>();
         let engine = repo_rs_engine::DefaultOverview;
         let output = engine.overview(ctx, projects).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

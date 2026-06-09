@@ -34,7 +34,7 @@ impl Command for StatusArgs {
         for r in &report {
             let branch = r.branch.as_deref().unwrap_or("(detached)");
             let dirty = if r.dirty { " *" } else { "" };
-            tracing::info!("{}: {}{}", r.project, branch, dirty);
+            println!("{}: {}{}", r.project, branch, dirty);
         }
 
         Ok(ExitCode::SUCCESS)

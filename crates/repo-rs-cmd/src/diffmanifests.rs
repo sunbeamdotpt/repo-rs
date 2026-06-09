@@ -43,7 +43,7 @@ impl Command for DiffManifestsArgs {
             self.manifest2.clone(),
             opts,
         ).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

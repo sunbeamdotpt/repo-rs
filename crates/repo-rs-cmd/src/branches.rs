@@ -23,7 +23,7 @@ impl Command for BranchesArgs {
         let projects = ctx.client.projects.keys().cloned().collect::<Vec<_>>();
         let engine = repo_rs_engine::DefaultBranches;
         let output = engine.branches(ctx, projects).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

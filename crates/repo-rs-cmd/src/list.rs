@@ -48,7 +48,7 @@ impl Command for ListArgs {
 
         let engine = repo_rs_engine::DefaultList;
         let output = engine.list(ctx, opts).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

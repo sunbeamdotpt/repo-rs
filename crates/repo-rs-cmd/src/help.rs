@@ -26,7 +26,7 @@ impl Command for HelpArgs {
     async fn execute(&self, ctx: &Context) -> Result<ExitCode, Error> {
         let engine = repo_rs_engine::DefaultHelp;
         let output = engine.help(ctx, self.command.clone()).await?;
-        tracing::info!("{}", output);
+        println!("{}", output);
 
         Ok(ExitCode::SUCCESS)
     }

@@ -73,10 +73,10 @@ impl Command for UploadArgs {
         let engine = repo_rs_engine::DefaultUpload;
         let report = engine.upload(ctx, projects, opts).await?;
         for pushed in &report.pushed {
-            tracing::info!("{}", pushed);
+            println!("{}", pushed);
         }
         for error in &report.errors {
-            tracing::error!("{}", error);
+            eprintln!("{}", error);
         }
 
         Ok(ExitCode::SUCCESS)

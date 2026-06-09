@@ -19,7 +19,7 @@ impl Command for VersionArgs {
     async fn execute(&self, ctx: &Context) -> Result<ExitCode, Error> {
         let engine = repo_rs_engine::DefaultVersion;
         let info = engine.version(ctx).await?;
-        tracing::info!("repo version {}", info.repo_version);
+        println!("repo version {}", info.repo_version);
 
         Ok(ExitCode::SUCCESS)
     }

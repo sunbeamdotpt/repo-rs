@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-06-09
+
+### Fixed
+
+- **command output to stdout**: `repo list`, `repo branches`, `repo manifest`, `repo info`, `repo status`, `repo diff`, `repo overview`, `repo help`, `repo diffmanifests`, `repo version`, and `repo upload` now print their output directly to stdout/stderr instead of via `tracing::info!`. This fixes the issue where these commands produced no visible output when `repo-rs` was used as a library inside another binary (e.g. `sunbeam`) with a tracing subscriber that filtered out `INFO` level events for `repo_rs_*` crates.
+
 ## [0.2.2] - 2026-06-09
 
 ### Fixed
