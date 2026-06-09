@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-09
+
+### Fixed
+
+- **sync copyfiles/linkfiles**: `copyfile` and `linkfile` elements from the manifest XML are now correctly applied after clone and checkout during `repo sync`
+- **linkfile symlink creation**: `linkfile` elements now create symbolic links at the destination path pointing to the source path within the project worktree
+
+### Added
+
+- **regression tests**: Added tests covering copyfile and linkfile application during both clone and checkout operations
+
 ## [0.2.0] - 2026-06-09
 
 _This release brings the `repo-rs-manifest` crate to feature parity with the Python reference implementation's XML manifest handling._

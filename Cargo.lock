@@ -376,6 +376,9 @@ dependencies = [
  "libc",
  "libgit2-sys",
  "log",
+ "openssl-probe",
+ "openssl-sys",
+ "url",
 ]
 
 [[package]]
@@ -591,7 +594,9 @@ checksum = "005d6ae6eac1912906073e069f7db60b1fa98e052a68227824afe3e3a1c59ca2"
 dependencies = [
  "cc",
  "libc",
+ "libssh2-sys",
  "libz-sys",
+ "openssl-sys",
  "pkg-config",
 ]
 
@@ -602,6 +607,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f02ab6bace2054fb888a3c16f990117b579d14a3088e472d63c6011fa185c9d3"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "libssh2-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "220e4f05ad4a218192533b300327f5150e809b54c4ec83b5a1d91833601811b9"
+dependencies = [
+ "cc",
+ "libc",
+ "libz-sys",
+ "openssl-sys",
+ "pkg-config",
+ "vcpkg",
 ]
 
 [[package]]
@@ -706,6 +725,24 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "openssl-probe"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
+
+[[package]]
+name = "openssl-sys"
+version = "0.9.116"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f28a22dc7140cda5f096e5e7724a6962ca81a7f8bfd2979f9b18c11af56318c4"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
 
 [[package]]
 name = "option-ext"
@@ -884,7 +921,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "repo-rs-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anstream",
  "camino",
@@ -903,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-cmd"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anstream",
  "async-trait",
@@ -920,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-engine"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anstream",
  "async-trait",
@@ -944,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-git"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "camino",
@@ -961,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-manifest"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "camino",
  "indexmap",
@@ -975,7 +1012,7 @@ dependencies = [
 
 [[package]]
 name = "repo-rs-model"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "camino",
  "indexmap",

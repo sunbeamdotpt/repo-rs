@@ -66,7 +66,10 @@ impl Command for SyncArgs {
         };
 
         let engine = repo_rs_engine::DefaultSync;
-        let _report = engine.sync(ctx, projects, opts).await?;
+        let report = engine.sync(ctx, projects, opts).await?;
+        if !report.errors.is_empty() {
+            eprintln!("Sync errors: {:?}", report.errors);
+        }
 
         Ok(ExitCode::SUCCESS)
     }

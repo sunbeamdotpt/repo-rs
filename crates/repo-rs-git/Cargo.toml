@@ -11,7 +11,7 @@ keywords = ["repo", "git", "manifest"]
 categories = ["development-tools"]
 
 [dependencies]
-git2 = { workspace = true }
+git2 = { workspace = true, features = ["vendored-libgit2", "https", "ssh"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
