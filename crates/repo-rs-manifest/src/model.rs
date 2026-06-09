@@ -110,6 +110,8 @@ pub struct Project {
     pub copyfiles: Vec<CopyFile>,
     /// Files to symlink after sync.
     pub linkfiles: Vec<LinkFile>,
+    /// Whether to rebase local changes on sync.
+    pub rebase: Option<bool>,
     /// Child projects within this project.
     pub subprojects: Vec<Project>,
 }
@@ -250,7 +252,7 @@ impl Project {
     pub fn default_test() -> Self {
         Self {
             name: String::new(),
-            path: None,
+            path: Some(String::new()),
             remote: None,
             revision: None,
             dest_branch: None,
@@ -266,6 +268,7 @@ impl Project {
             copyfiles: Vec::new(),
             linkfiles: Vec::new(),
             subprojects: Vec::new(),
+            rebase: None,
         }
     }
 }

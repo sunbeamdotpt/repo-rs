@@ -3,7 +3,10 @@
 
 use crate::Error;
 use crate::model::*;
-use crate::validate::is_valid_path;
+use crate::validate::{
+    is_valid_path, is_valid_path_cwd_dot_ok, is_valid_path_dir_cwd_dot_ok,
+    is_valid_path_dir_ok,
+};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashSet;
@@ -45,6 +48,9 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest, Error> {
                         manifest.remotes.insert(remote.name.clone(), remote);
                     }
                     "default" => {
+                        if manifest.default.is_some() {
+                            return Err(Error::DuplicateDefault);
+                        }
                         manifest.default = Some(parse_default(&reader, &e)?);
                     }
                     "remove-project" => {
@@ -60,15 +66,24 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest, Error> {
                         manifest.submanifests.insert(sm.name.clone(), sm);
                     }
                     "repo-hooks" => {
+                        if manifest.repo_hooks.is_some() {
+                            return Err(Error::DuplicateRepoHooks);
+                        }
                         manifest.repo_hooks = Some(parse_repo_hooks(&reader, &e)?);
                     }
                     "superproject" => {
+                        if manifest.superproject.is_some() {
+                            return Err(Error::DuplicateSuperproject);
+                        }
                         manifest.superproject = Some(parse_superproject(&reader, &e)?);
                     }
                     "contactinfo" => {
                         manifest.contactinfo = Some(parse_contactinfo(&reader, &e)?);
                     }
                     "manifest-server" => {
+                        if manifest.manifest_server.is_some() {
+                            return Err(Error::DuplicateManifestServer);
+                        }
                         manifest.manifest_server = Some(parse_manifest_server(&reader, &e)?);
                     }
                     "include" => {
@@ -94,7 +109,10 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest, Error> {
                     }
                     "notice" => {
                         let text = read_text_content(&mut reader, &mut buf, "notice")?;
-                        manifest.notice = Some(text);
+                        if manifest.notice.is_some() {
+                            return Err(Error::DuplicateNotice);
+                        }
+                        manifest.notice = Some(dedent_notice(&text));
                     }
                     _ => {}
                 }
@@ -110,6 +128,9 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest, Error> {
                         manifest.remotes.insert(remote.name.clone(), remote);
                     }
                     "default" => {
+                        if manifest.default.is_some() {
+                            return Err(Error::DuplicateDefault);
+                        }
                         manifest.default = Some(parse_default(&reader, &e)?);
                     }
                     "project" => {
@@ -138,15 +159,24 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest, Error> {
                         manifest.submanifests.insert(sm.name.clone(), sm);
                     }
                     "repo-hooks" => {
+                        if manifest.repo_hooks.is_some() {
+                            return Err(Error::DuplicateRepoHooks);
+                        }
                         manifest.repo_hooks = Some(parse_repo_hooks(&reader, &e)?);
                     }
                     "superproject" => {
+                        if manifest.superproject.is_some() {
+                            return Err(Error::DuplicateSuperproject);
+                        }
                         manifest.superproject = Some(parse_superproject(&reader, &e)?);
                     }
                     "contactinfo" => {
                         manifest.contactinfo = Some(parse_contactinfo(&reader, &e)?);
                     }
                     "manifest-server" => {
+                        if manifest.manifest_server.is_some() {
+                            return Err(Error::DuplicateManifestServer);
+                        }
                         manifest.manifest_server = Some(parse_manifest_server(&reader, &e)?);
                     }
                     "include" => {
@@ -267,7 +297,7 @@ fn required_attr(
 fn parse_groups(s: Option<&str>) -> HashSet<String> {
     match s {
         Some(s) => s
-            .split(',')
+            .split([',', ' ', '\t', '\n', '\r'].as_ref())
             .map(|g| g.trim().to_string())
             .filter(|g| !g.is_empty())
             .collect(),
@@ -275,17 +305,39 @@ fn parse_groups(s: Option<&str>) -> HashSet<String> {
     }
 }
 
-fn parse_bool(s: Option<&str>) -> Option<bool> {
-    s.map(|v| v == "true")
+fn parse_bool(s: Option<&str>, attr_name: &str) -> Result<Option<bool>, Error> {
+    match s {
+        None => Ok(None),
+        Some(v) => {
+            let lower = v.to_lowercase();
+            match lower.as_str() {
+                "yes" | "true" | "1" => Ok(Some(true)),
+                "no" | "false" | "0" => Ok(Some(false)),
+                _ => Err(Error::InvalidBoolean {
+                    attr: attr_name.to_string(),
+                    value: v.to_string(),
+                }),
+            }
+        }
+    }
 }
 
-fn parse_u32(s: Option<&str>) -> Result<Option<u32>, Error> {
+fn parse_u32(s: Option<&str>, attr_name: &str) -> Result<Option<u32>, Error> {
     match s {
-        Some(v) => v
-            .parse::<u32>()
-            .map(Some)
-            .map_err(|e: std::num::ParseIntError| Error::InvalidPath(e.to_string())),
         None => Ok(None),
+        Some(v) => {
+            let num = v.parse::<u32>().map_err(|_| Error::InvalidInteger {
+                attr: attr_name.to_string(),
+                value: v.to_string(),
+            })?;
+            if num == 0 {
+                return Err(Error::InvalidPositiveInteger {
+                    attr: attr_name.to_string(),
+                    value: v.to_string(),
+                });
+            }
+            Ok(Some(num))
+        }
     }
 }
 
@@ -313,11 +365,11 @@ fn parse_default(
         revision: attr(reader, e, "revision")?,
         dest_branch: attr(reader, e, "dest-branch")?,
         upstream: attr(reader, e, "upstream")?,
-        sync_j: parse_u32(attr(reader, e, "sync-j")?.as_deref())?,
-        sync_j_max: parse_u32(attr(reader, e, "sync-j-max")?.as_deref())?,
-        sync_c: parse_bool(attr(reader, e, "sync-c")?.as_deref()),
-        sync_s: parse_bool(attr(reader, e, "sync-s")?.as_deref()),
-        sync_tags: parse_bool(attr(reader, e, "sync-tags")?.as_deref()),
+        sync_j: parse_u32(attr(reader, e, "sync-j")?.as_deref(), "sync-j")?,
+        sync_j_max: parse_u32(attr(reader, e, "sync-j-max")?.as_deref(), "sync-j-max")?,
+        sync_c: parse_bool(attr(reader, e, "sync-c")?.as_deref(), "sync-c")?,
+        sync_s: parse_bool(attr(reader, e, "sync-s")?.as_deref(), "sync-s")?,
+        sync_tags: parse_bool(attr(reader, e, "sync-tags")?.as_deref(), "sync-tags")?,
     })
 }
 
@@ -326,12 +378,23 @@ fn parse_project(
     e: &quick_xml::events::BytesStart<'_>,
 ) -> Result<Project, Error> {
     let name = required_attr(reader, e, "name")?;
+    if let Some(msg) = check_project_name(&name) {
+        return Err(Error::InvalidProjectName(format!(
+            "<project> invalid \"name\": {name}: {msg}"
+        )));
+    }
+
     let path = attr(reader, e, "path")?;
     if let Some(ref p) = path {
-        if !is_valid_path(p) {
-            return Err(Error::InvalidPath(format!("invalid project path: {p}")));
+        if let Some(msg) = check_project_path(p) {
+            return Err(Error::InvalidPath(format!(
+                "<project> invalid \"path\": {p}: {msg}"
+            )));
         }
     }
+    // Path defaults to name when omitted.
+    let path = Some(path.unwrap_or_else(|| name.clone()));
+
     Ok(Project {
         name,
         path,
@@ -339,13 +402,14 @@ fn parse_project(
         revision: attr(reader, e, "revision")?,
         dest_branch: attr(reader, e, "dest-branch")?,
         groups: parse_groups(attr(reader, e, "groups")?.as_deref()),
-        sync_c: parse_bool(attr(reader, e, "sync-c")?.as_deref()),
-        sync_s: parse_bool(attr(reader, e, "sync-s")?.as_deref()),
-        sync_tags: parse_bool(attr(reader, e, "sync-tags")?.as_deref()),
+        sync_c: parse_bool(attr(reader, e, "sync-c")?.as_deref(), "sync-c")?,
+        sync_s: parse_bool(attr(reader, e, "sync-s")?.as_deref(), "sync-s")?,
+        sync_tags: parse_bool(attr(reader, e, "sync-tags")?.as_deref(), "sync-tags")?,
         upstream: attr(reader, e, "upstream")?,
-        clone_depth: parse_u32(attr(reader, e, "clone-depth")?.as_deref())?,
-        force_path: parse_bool(attr(reader, e, "force-path")?.as_deref()),
+        clone_depth: parse_u32(attr(reader, e, "clone-depth")?.as_deref(), "clone-depth")?,
+        force_path: parse_bool(attr(reader, e, "force-path")?.as_deref(), "force-path")?,
         sync_strategy: attr(reader, e, "sync-strategy")?,
+        rebase: parse_bool(attr(reader, e, "rebase")?.as_deref(), "rebase")?,
         annotations: Vec::new(),
         copyfiles: Vec::new(),
         linkfiles: Vec::new(),
@@ -380,7 +444,7 @@ fn parse_remove_project(
     Ok(RemoveProject {
         name: attr(reader, e, "name")?,
         path: attr(reader, e, "path")?,
-        optional: parse_bool(attr(reader, e, "optional")?.as_deref()).unwrap_or(false),
+        optional: parse_bool(attr(reader, e, "optional")?.as_deref(), "optional")?.unwrap_or(false),
         base_rev: attr(reader, e, "base-rev")?,
     })
 }
@@ -389,13 +453,39 @@ fn parse_submanifest(
     reader: &Reader<&[u8]>,
     e: &quick_xml::events::BytesStart<'_>,
 ) -> Result<Submanifest, Error> {
+    let name = required_attr(reader, e, "name")?;
+    let path = attr(reader, e, "path")?;
+    let revision = attr(reader, e, "revision")?;
+
+    // Validate name/path/revision for path safety
+    if let Some(ref p) = path {
+        if let Some(msg) = check_project_path(p) {
+            return Err(Error::InvalidPath(format!(
+                "<submanifest> invalid \"path\": {p}: {msg}"
+            )));
+        }
+    } else if let Some(ref r) = revision {
+        let check = r.split('/').last().unwrap_or(r);
+        if let Some(msg) = check_project_path(check) {
+            return Err(Error::InvalidPath(format!(
+                "<submanifest> invalid \"revision\": {r}: {msg}"
+            )));
+        }
+    } else {
+        if let Some(msg) = check_project_path(&name) {
+            return Err(Error::InvalidPath(format!(
+                "<submanifest> invalid \"name\": {name}: {msg}"
+            )));
+        }
+    }
+
     Ok(Submanifest {
-        name: required_attr(reader, e, "name")?,
+        name,
         remote: attr(reader, e, "remote")?,
         project: attr(reader, e, "project")?,
         manifest_name: attr(reader, e, "manifest-name")?,
-        revision: attr(reader, e, "revision")?,
-        path: attr(reader, e, "path")?,
+        revision,
+        path,
         groups: parse_groups(attr(reader, e, "groups")?.as_deref()),
         default_groups: parse_groups(attr(reader, e, "default-groups")?.as_deref()),
     })
@@ -453,10 +543,19 @@ fn parse_annotation(
     reader: &Reader<&[u8]>,
     e: &quick_xml::events::BytesStart<'_>,
 ) -> Result<Annotation, Error> {
+    let keep_str = attr(reader, e, "keep")?;
+    let keep = match keep_str.as_deref() {
+        None => true,
+        Some("true") => true,
+        Some("false") => false,
+        Some(other) => {
+            return Err(Error::InvalidAnnotationKeep(other.to_string()));
+        }
+    };
     Ok(Annotation {
         name: required_attr(reader, e, "name")?,
         value: required_attr(reader, e, "value")?,
-        keep: attr(reader, e, "keep")?.as_deref() != Some("false"),
+        keep,
     })
 }
 
@@ -464,20 +563,42 @@ fn parse_copyfile(
     reader: &Reader<&[u8]>,
     e: &quick_xml::events::BytesStart<'_>,
 ) -> Result<CopyFile, Error> {
-    Ok(CopyFile {
-        src: required_attr(reader, e, "src")?,
-        dest: required_attr(reader, e, "dest")?,
-    })
+    let src = required_attr(reader, e, "src")?;
+    let dest = required_attr(reader, e, "dest")?;
+
+    if let Some(msg) = check_copyfile_dest(&dest) {
+        return Err(Error::InvalidCopyfileDest(format!(
+            "<copyfile> invalid \"dest\": {dest}: {msg}"
+        )));
+    }
+    if let Some(msg) = check_copyfile_src(&src) {
+        return Err(Error::InvalidCopyfileSrc(format!(
+            "<copyfile> invalid \"src\": {src}: {msg}"
+        )));
+    }
+
+    Ok(CopyFile { src, dest })
 }
 
 fn parse_linkfile(
     reader: &Reader<&[u8]>,
     e: &quick_xml::events::BytesStart<'_>,
 ) -> Result<LinkFile, Error> {
-    Ok(LinkFile {
-        src: required_attr(reader, e, "src")?,
-        dest: required_attr(reader, e, "dest")?,
-    })
+    let src = required_attr(reader, e, "src")?;
+    let dest = required_attr(reader, e, "dest")?;
+
+    if let Some(msg) = check_linkfile_dest(&dest) {
+        return Err(Error::InvalidLinkfileDest(format!(
+            "<linkfile> invalid \"dest\": {dest}: {msg}"
+        )));
+    }
+    if let Some(msg) = check_linkfile_src(&src) {
+        return Err(Error::InvalidLinkfileSrc(format!(
+            "<linkfile> invalid \"src\": {src}: {msg}"
+        )));
+    }
+
+    Ok(LinkFile { src, dest })
 }
 
 fn resolve_general_ref(content: &str) -> Result<String, Error> {
@@ -544,6 +665,104 @@ fn read_text_content(
     Ok(text)
 }
 
+/// Dedent notice text in a docstring-like fashion.
+///
+/// Based on Python's PEP-0257 docstring handling.
+fn dedent_notice(text: &str) -> String {
+    let lines: Vec<&str> = text.split('\n').collect();
+    if lines.is_empty() {
+        return text.to_string();
+    }
+
+    // First line is kept as-is (same line as <notice> tag), but stripped of
+    // leading/trailing whitespace.
+    let mut result = vec![lines[0].trim().to_string()];
+
+    // Find minimum indentation among remaining non-empty lines.
+    let mut min_indent: Option<usize> = None;
+    for line in &lines[1..] {
+        let stripped = line.trim_start();
+        if !stripped.is_empty() {
+            let indent = line.len() - stripped.len();
+            min_indent = Some(min_indent.map_or(indent, |m| m.min(indent)));
+        }
+    }
+
+    // Process remaining lines, stripping min_indent and trailing whitespace.
+    let min_indent = min_indent.unwrap_or(0);
+    for line in &lines[1..] {
+        if line.len() >= min_indent {
+            result.push(line[min_indent..].trim_end().to_string());
+        } else {
+            result.push(line.trim_end().to_string());
+        }
+    }
+
+    // Trim completely blank lines from front and back.
+    while result.len() > 1 && result[0].is_empty() {
+        result.remove(0);
+    }
+    while result.len() > 1 && result.last().unwrap().is_empty() {
+        result.pop();
+    }
+
+    result.join("\n")
+}
+
+/// Check a project name for validity.
+///
+/// Similar to `_CheckLocalPath` with `dir_ok=true`.
+fn check_project_name(name: &str) -> Option<&'static str> {
+    if !is_valid_path_dir_ok(name) {
+        Some("invalid path characters")
+    } else {
+        None
+    }
+}
+
+/// Check a project path for validity.
+///
+/// Similar to `_CheckLocalPath` with `dir_ok=true, cwd_dot_ok=true`.
+fn check_project_path(path: &str) -> Option<&'static str> {
+    if !is_valid_path_dir_cwd_dot_ok(path) {
+        Some("invalid path characters")
+    } else {
+        None
+    }
+}
+
+fn check_copyfile_dest(dest: &str) -> Option<&'static str> {
+    if !is_valid_path(dest) {
+        Some("invalid path characters")
+    } else {
+        None
+    }
+}
+
+fn check_copyfile_src(src: &str) -> Option<&'static str> {
+    if !is_valid_path_cwd_dot_ok(src) {
+        Some("invalid path characters")
+    } else {
+        None
+    }
+}
+
+fn check_linkfile_dest(dest: &str) -> Option<&'static str> {
+    if !is_valid_path(dest) {
+        Some("invalid path characters")
+    } else {
+        None
+    }
+}
+
+fn check_linkfile_src(src: &str) -> Option<&'static str> {
+    if !is_valid_path_dir_cwd_dot_ok(src) {
+        Some("invalid path characters")
+    } else {
+        None
+    }
+}
+
 /// Validate a parsed manifest.
 ///
 /// Checks that all project remote references refer to defined remotes.
@@ -552,15 +771,25 @@ fn read_text_content(
 ///
 /// Returns an error if a project references an undefined remote.
 pub fn validate_manifest(manifest: &Manifest) -> Result<(), Error> {
+    fn remote_exists(manifest: &Manifest, name: &str) -> bool {
+        if manifest.remotes.contains_key(name) {
+            return true;
+        }
+        manifest
+            .remotes
+            .values()
+            .any(|r| r.alias.as_deref() == Some(name))
+    }
+
     for project in &manifest.projects {
         if let Some(ref remote_name) = project.remote {
-            if !manifest.remotes.contains_key(remote_name) {
+            if !remote_exists(manifest, remote_name) {
                 return Err(Error::UnknownRemote(remote_name.clone()));
             }
         }
         for subproject in &project.subprojects {
             if let Some(ref remote_name) = subproject.remote {
-                if !manifest.remotes.contains_key(remote_name) {
+                if !remote_exists(manifest, remote_name) {
                     return Err(Error::UnknownRemote(remote_name.clone()));
                 }
             }
@@ -602,6 +831,15 @@ mod tests {
         let manifest = parse_manifest(xml).unwrap();
         assert!(manifest.projects[0].groups.contains("group1"));
         assert!(manifest.projects[0].groups.contains("group2"));
+    }
+
+    #[test]
+    fn parse_manifest_with_whitespace_groups() {
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<manifest>\n  <project name=\"foo\" path=\"foo\" groups=\"group1 group2\tgroup3\" />\n</manifest>\n";
+        let manifest = parse_manifest(xml).unwrap();
+        assert!(manifest.projects[0].groups.contains("group1"));
+        assert!(manifest.projects[0].groups.contains("group2"));
+        assert!(manifest.projects[0].groups.contains("group3"));
     }
 
     #[test]
@@ -878,6 +1116,37 @@ Line 3</notice>
     }
 
     #[test]
+    fn parse_notice_with_dedenting() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <notice>First line
+    Second line
+    Third line
+  </notice>
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(
+            manifest.notice,
+            Some("First line\nSecond line\nThird line".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_notice_with_blank_lines() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <notice>
+    Line 1
+    Line 2
+  </notice>
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.notice, Some("Line 1\nLine 2".to_string()));
+    }
+
+    #[test]
     fn reject_missing_required_attribute_remote_name() {
         let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <manifest>
@@ -1051,7 +1320,18 @@ Line 3</notice>
 </manifest>
 "#;
         let err = parse_manifest(xml).unwrap_err();
-        assert!(err.to_string().contains("invalid project path"));
+        assert!(err.to_string().contains("invalid \"path\""));
+    }
+
+    #[test]
+    fn reject_invalid_project_name() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="../foo" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid project name"));
     }
 
     #[test]
@@ -1114,7 +1394,7 @@ Line 3</notice>
 </manifest>
 "#;
         let manifest = parse_manifest(xml).unwrap();
-        assert_eq!(manifest.projects[0].path, None);
+        assert_eq!(manifest.projects[0].path, Some("foo".to_string()));
     }
 
     #[test]
@@ -1471,6 +1751,406 @@ Line 3</notice>
   <notice>unclosed text
 "#;
         let manifest = parse_manifest(xml).unwrap();
-        assert_eq!(manifest.notice, Some("unclosed text\n".to_string()));
+        assert_eq!(manifest.notice, Some("unclosed text".to_string()));
+    }
+
+    // New tests for improved features
+
+    #[test]
+    fn reject_duplicate_notice() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <notice>First</notice>
+  <notice>Second</notice>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate notice"));
+    }
+
+    #[test]
+    fn reject_duplicate_default() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <default remote="origin" revision="main" />
+  <default remote="other" revision="dev" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate default"));
+    }
+
+    #[test]
+    fn reject_duplicate_manifest_server() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <manifest-server url="https://a.com" />
+  <manifest-server url="https://b.com" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate manifest-server"));
+    }
+
+    #[test]
+    fn reject_duplicate_repo_hooks() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <repo-hooks in-project="hooks1" enabled-list="a.txt" />
+  <repo-hooks in-project="hooks2" enabled-list="b.txt" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate repo-hooks"));
+    }
+
+    #[test]
+    fn reject_duplicate_superproject() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <superproject name="super1" />
+  <superproject name="super2" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate superproject"));
+    }
+
+    #[test]
+    fn parse_boolean_yes_no() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo" sync-c="yes" sync-s="no" sync-tags="1" force-path="0" />
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        let proj = &manifest.projects[0];
+        assert_eq!(proj.sync_c, Some(true));
+        assert_eq!(proj.sync_s, Some(false));
+        assert_eq!(proj.sync_tags, Some(true));
+        assert_eq!(proj.force_path, Some(false));
+    }
+
+    #[test]
+    fn reject_invalid_boolean() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo" sync-c="maybe" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid boolean"));
+    }
+
+    #[test]
+    fn reject_zero_sync_j() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <default remote="origin" revision="main" sync-j="0" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("must be greater than 0"));
+    }
+
+    #[test]
+    fn reject_zero_clone_depth() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo" clone-depth="0" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("must be greater than 0"));
+    }
+
+    #[test]
+    fn reject_invalid_integer() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <default remote="origin" revision="main" sync-j="abc" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid integer"));
+    }
+
+    #[test]
+    fn reject_invalid_annotation_keep() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <annotation name="a" value="b" keep="maybe" />
+  </project>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid annotation keep"));
+    }
+
+    #[test]
+    fn reject_invalid_copyfile_dest() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <copyfile src="a" dest="../b" />
+  </project>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid copyfile dest"));
+    }
+
+    #[test]
+    fn reject_invalid_copyfile_src() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <copyfile src="../a" dest="b" />
+  </project>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid copyfile src"));
+    }
+
+    #[test]
+    fn reject_invalid_linkfile_dest() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <linkfile src="a" dest="../b" />
+  </project>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid linkfile dest"));
+    }
+
+    #[test]
+    fn reject_invalid_linkfile_src() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <linkfile src="../a" dest="b" />
+  </project>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid linkfile src"));
+    }
+
+    #[test]
+    fn allow_linkfile_src_dot() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <linkfile src="." dest="link" />
+  </project>
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.projects[0].linkfiles[0].src, ".");
+    }
+
+    #[test]
+    fn allow_copyfile_src_dot() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" path="foo">
+    <copyfile src="." dest="copy" />
+  </project>
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.projects[0].copyfiles[0].src, ".");
+    }
+
+    #[test]
+    fn reject_project_name_with_tilde() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo~bar" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid project name"));
+    }
+
+    #[test]
+    fn reject_submanifest_invalid_name() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <submanifest name="../evil" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid"));
+    }
+
+    #[test]
+    fn reject_submanifest_invalid_path() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <submanifest name="sub" path="../evil" />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid"));
+    }
+
+    #[test]
+    fn reject_submanifest_invalid_revision() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <submanifest name="sub" revision="branch/.." />
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("invalid"));
+    }
+
+    #[test]
+    fn dedent_notice_single_line() {
+        assert_eq!(dedent_notice("Hello"), "Hello");
+    }
+
+    #[test]
+    fn dedent_notice_empty() {
+        assert_eq!(dedent_notice(""), "");
+    }
+
+    #[test]
+    fn parse_project_path_defaults_to_name() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo/bar" />
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.projects[0].path, Some("foo/bar".to_string()));
+        assert_eq!(manifest.projects[0].name, "foo/bar");
+    }
+
+    #[test]
+    fn reject_duplicate_default_start_tag() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <default remote="origin" revision="main"></default>
+  <default remote="other" revision="dev"></default>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate default"));
+    }
+
+    #[test]
+    fn reject_duplicate_repo_hooks_start_tag() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <repo-hooks in-project="hooks1" enabled-list="a.txt"></repo-hooks>
+  <repo-hooks in-project="hooks2" enabled-list="b.txt"></repo-hooks>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate repo-hooks"));
+    }
+
+    #[test]
+    fn reject_duplicate_superproject_start_tag() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <superproject name="super1"></superproject>
+  <superproject name="super2"></superproject>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate superproject"));
+    }
+
+    #[test]
+    fn reject_duplicate_manifest_server_start_tag() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <manifest-server url="https://a.com"></manifest-server>
+  <manifest-server url="https://b.com"></manifest-server>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("duplicate manifest-server"));
+    }
+
+    #[test]
+    fn reject_unknown_entity_reference() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <notice>&unknown;</notice>
+</manifest>
+"#;
+        let err = parse_manifest(xml).unwrap_err();
+        assert!(err.to_string().contains("unknown entity reference"));
+    }
+
+    #[test]
+    fn parse_project_with_rebase_true() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" rebase="true" />
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.projects[0].rebase, Some(true));
+    }
+
+    #[test]
+    fn parse_project_with_rebase_false() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" rebase="false" />
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.projects[0].rebase, Some(false));
+    }
+
+    #[test]
+    fn parse_project_rebase_defaults_to_none() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="foo" />
+</manifest>
+"#;
+        let manifest = parse_manifest(xml).unwrap();
+        assert_eq!(manifest.projects[0].rebase, None);
+    }
+
+    #[test]
+    fn validate_manifest_accepts_remote_alias() {
+        let manifest = Manifest {
+            remotes: {
+                let mut m = indexmap::IndexMap::new();
+                m.insert(
+                    "origin".to_string(),
+                    Remote {
+                        name: "origin".to_string(),
+                        alias: Some("o".to_string()),
+                        fetch: "https://example.com".to_string(),
+                        pushurl: None,
+                        review: None,
+                        revision: None,
+                        annotations: Vec::new(),
+                    },
+                );
+                m
+            },
+            projects: vec![Project {
+                name: "foo".to_string(),
+                path: Some("foo".to_string()),
+                remote: Some("o".to_string()),
+                ..Project::default_test()
+            }],
+            ..Manifest::default()
+        };
+        validate_manifest(&manifest).unwrap();
     }
 }
