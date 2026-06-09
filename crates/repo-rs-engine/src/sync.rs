@@ -113,6 +113,12 @@ impl Sync for DefaultSync {
                     Ok(_) => {
                         report.fetched.push(project.name.clone());
                         report.checked_out.push(project.name.clone());
+                        if let Err(e) = apply_copyfiles_and_linkfiles(ctx, project) {
+                            report.errors.push(format!(
+                                "failed to apply copyfiles/linkfiles for {}: {e}",
+                                project.name
+                            ));
+                        }
                     }
                     Err(e) => {
                         report.errors.push(format!(
@@ -182,12 +188,63 @@ impl Sync for DefaultSync {
                     continue;
                 } else {
                     report.checked_out.push(project.name.clone());
+                    if let Err(e) = apply_copyfiles_and_linkfiles(ctx, project) {
+                        report.errors.push(format!(
+                            "failed to apply copyfiles/linkfiles for {}: {e}",
+                            project.name
+                        ));
+                    }
                 }
             }
         }
 
         Ok(report)
     }
+}
+
+/// Apply copyfile and linkfile directives for a project.
+///
+/// * `src` paths are resolved relative to the project's worktree.
+/// * `dest` paths are resolved relative to the repo root.
+fn apply_copyfiles_and_linkfiles(ctx: &Context, project: &repo_rs_model::Project) -> Result<(), Error> {
+    for cf in &project.copyfiles {
+        let src = project.worktree.join(&cf.src);
+        let dest = ctx.repo_root.join(&cf.dest);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(&src, &dest)?;
+    }
+
+    for lf in &project.linkfiles {
+        let src = project.worktree.join(&lf.src);
+        let dest = ctx.repo_root.join(&lf.dest);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        // Remove existing file or symlink at dest before creating a new one.
+        if dest.exists() || dest.symlink_metadata().is_ok() {
+            if dest.is_dir() {
+                std::fs::remove_dir_all(&dest)?;
+            } else {
+                std::fs::remove_file(&dest)?;
+            }
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&src, &dest)?;
+        }
+        #[cfg(windows)]
+        {
+            if src.is_dir() {
+                std::os::windows::fs::symlink_dir(&src, &dest)?;
+            } else {
+                std::os::windows::fs::symlink_file(&src, &dest)?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -465,5 +522,214 @@ mod tests {
         assert!(report.fetched.is_empty());
         assert!(report.checked_out.is_empty());
         assert!(report.errors[0].contains("invalid url"));
+    }
+
+    #[tokio::test]
+    async fn test_sync_creates_copyfiles_after_clone() {
+        let tmp = tempdir().unwrap();
+        let root = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
+        let mut project = make_project("foo", "foo", "https://example.com/foo.git");
+        project.copyfiles = vec![repo_rs_model::project::CopyFile {
+            src: Utf8PathBuf::from("src.txt"),
+            dest: Utf8PathBuf::from("dest.txt"),
+        }];
+        let mut ctx = make_context(&tmp, vec![project.clone()]);
+
+        // Create the worktree with a source file.
+        let worktree = root.join("foo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join("src.txt"), "hello copy").unwrap();
+
+        let mut mock = MockGitBackend::new();
+        mock.expect_clone()
+            .times(1)
+            .returning(|_, _, _, _, _| {
+                Box::pin(async {
+                    let dir = tempdir().unwrap();
+                    let path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+                    Ok(git2::Repository::init(&path).unwrap())
+                })
+            });
+        ctx.git = Arc::new(mock);
+
+        let engine = DefaultSync;
+        let report = engine
+            .sync(&ctx, vec![Utf8PathBuf::from("foo")], SyncOptions::default())
+            .await
+            .unwrap();
+        assert!(report.fetched.contains(&"foo".to_string()));
+        assert!(report.checked_out.contains(&"foo".to_string()));
+        assert!(report.errors.is_empty());
+
+        let dest = root.join("dest.txt");
+        assert!(dest.exists());
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "hello copy");
+    }
+
+    #[tokio::test]
+    async fn test_sync_creates_linkfiles_after_clone() {
+        let tmp = tempdir().unwrap();
+        let root = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
+        let mut project = make_project("foo", "foo", "https://example.com/foo.git");
+        project.linkfiles = vec![repo_rs_model::project::LinkFile {
+            src: Utf8PathBuf::from("src.txt"),
+            dest: Utf8PathBuf::from("link.txt"),
+        }];
+        let mut ctx = make_context(&tmp, vec![project.clone()]);
+
+        // Create the worktree with a source file.
+        let worktree = root.join("foo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join("src.txt"), "hello link").unwrap();
+
+        let mut mock = MockGitBackend::new();
+        mock.expect_clone()
+            .times(1)
+            .returning(|_, _, _, _, _| {
+                Box::pin(async {
+                    let dir = tempdir().unwrap();
+                    let path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+                    Ok(git2::Repository::init(&path).unwrap())
+                })
+            });
+        ctx.git = Arc::new(mock);
+
+        let engine = DefaultSync;
+        let report = engine
+            .sync(&ctx, vec![Utf8PathBuf::from("foo")], SyncOptions::default())
+            .await
+            .unwrap();
+        assert!(report.fetched.contains(&"foo".to_string()));
+        assert!(report.checked_out.contains(&"foo".to_string()));
+        assert!(report.errors.is_empty());
+
+        let dest = root.join("link.txt");
+        assert!(dest.symlink_metadata().is_ok());
+        assert!(std::fs::symlink_metadata(&dest).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "hello link");
+    }
+
+    #[tokio::test]
+    async fn test_sync_linkfile_replaces_existing_file() {
+        let tmp = tempdir().unwrap();
+        let root = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
+        let mut project = make_project("foo", "foo", "https://example.com/foo.git");
+        project.linkfiles = vec![repo_rs_model::project::LinkFile {
+            src: Utf8PathBuf::from("src.txt"),
+            dest: Utf8PathBuf::from("link.txt"),
+        }];
+        let mut ctx = make_context(&tmp, vec![project.clone()]);
+
+        // Create the worktree with a source file.
+        let worktree = root.join("foo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join("src.txt"), "new content").unwrap();
+        // Pre-create an existing regular file at the destination.
+        std::fs::write(root.join("link.txt"), "old content").unwrap();
+
+        let mut mock = MockGitBackend::new();
+        mock.expect_clone()
+            .times(1)
+            .returning(|_, _, _, _, _| {
+                Box::pin(async {
+                    let dir = tempdir().unwrap();
+                    let path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+                    Ok(git2::Repository::init(&path).unwrap())
+                })
+            });
+        ctx.git = Arc::new(mock);
+
+        let engine = DefaultSync;
+        let report = engine
+            .sync(&ctx, vec![Utf8PathBuf::from("foo")], SyncOptions::default())
+            .await
+            .unwrap();
+        assert!(report.errors.is_empty());
+
+        let dest = root.join("link.txt");
+        assert!(std::fs::symlink_metadata(&dest).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "new content");
+    }
+
+    #[tokio::test]
+    async fn test_sync_creates_nested_dest_directories() {
+        let tmp = tempdir().unwrap();
+        let root = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
+        let mut project = make_project("foo", "foo", "https://example.com/foo.git");
+        project.copyfiles = vec![repo_rs_model::project::CopyFile {
+            src: Utf8PathBuf::from("a.txt"),
+            dest: Utf8PathBuf::from("sub/dir/a.txt"),
+        }];
+        let mut ctx = make_context(&tmp, vec![project.clone()]);
+
+        let worktree = root.join("foo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join("a.txt"), "nested").unwrap();
+
+        let mut mock = MockGitBackend::new();
+        mock.expect_clone()
+            .times(1)
+            .returning(|_, _, _, _, _| {
+                Box::pin(async {
+                    let dir = tempdir().unwrap();
+                    let path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+                    Ok(git2::Repository::init(&path).unwrap())
+                })
+            });
+        ctx.git = Arc::new(mock);
+
+        let engine = DefaultSync;
+        let report = engine
+            .sync(&ctx, vec![Utf8PathBuf::from("foo")], SyncOptions::default())
+            .await
+            .unwrap();
+        assert!(report.errors.is_empty());
+
+        let dest = root.join("sub/dir/a.txt");
+        assert!(dest.exists());
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "nested");
+    }
+
+    #[tokio::test]
+    async fn test_sync_linkfiles_after_checkout() {
+        let tmp = tempdir().unwrap();
+        let root = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
+        let mut project = make_project("foo", "foo", "https://example.com/foo.git");
+        project.linkfiles = vec![repo_rs_model::project::LinkFile {
+            src: Utf8PathBuf::from("src.txt"),
+            dest: Utf8PathBuf::from("link.txt"),
+        }];
+        let mut ctx = make_context(&tmp, vec![project.clone()]);
+
+        let worktree = root.join("foo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join("src.txt"), "checkout link").unwrap();
+        git2::Repository::init(&worktree).unwrap();
+
+        let mut mock = MockGitBackend::new();
+        mock.expect_open()
+            .times(1)
+            .returning(|path| {
+                let path = path.clone();
+                Box::pin(async move { Ok(git2::Repository::open(&path).unwrap()) })
+            });
+        mock.expect_fetch()
+            .times(1)
+            .returning(|_, _, _, _, _, _| Box::pin(async { Ok(()) }));
+        mock.expect_checkout()
+            .times(1)
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        ctx.git = Arc::new(mock);
+
+        let engine = DefaultSync;
+        let report = engine
+            .sync(&ctx, vec![Utf8PathBuf::from("foo")], SyncOptions::default())
+            .await
+            .unwrap();
+        assert!(report.errors.is_empty());
+
+        let dest = root.join("link.txt");
+        assert!(std::fs::symlink_metadata(&dest).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "checkout link");
     }
 }
