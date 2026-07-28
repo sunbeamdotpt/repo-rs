@@ -1,5 +1,8 @@
 # repo-rs
 
+[![Matrix](https://img.shields.io/badge/chat-%23hello%3Asunbeam.pt-0dbd8b?logo=matrix)](https://matrix.to/#/#hello:sunbeam.pt)
+[![License](https://img.shields.io/github/license/sunbeamdotpt/repo-rs)](LICENSE-APACHE)
+
 A Rust implementation of the [Android repo tool](https://gerrit.googlesource.com/git-repo/), providing a fast, statically-linked binary for managing very large multi-repository projects.
 
 ## Why?
